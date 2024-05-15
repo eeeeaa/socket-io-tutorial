@@ -60,20 +60,32 @@
     <ul id="messages"></ul>
     <form id="form" action="">
       <input id="input" autocomplete="off" /><button>Send</button>
+      <button id="toggle-btn">Disconnect</button>
     </form>
     <script src="/socket.io/socket.io.js"></script>
     <script>
+      let counter = 0;
       //client/front-end side of socket io (i.e. usually on react, vue, etc.)
-      const socket = io();
+      const socket = io({
+        auth: {
+          serverOffset: 0,
+        },
+        // enable retries
+        ackTimeout: 10,
+        retries: 3,
+      });
 
       const form = document.getElementById("form");
       const input = document.getElementById("input");
       const messages = document.getElementById("messages");
+      const toggleButton = document.getElementById("toggle-btn");
 
       form.addEventListener("submit", (e) => {
         e.preventDefault();
         if (input.value) {
-          socket.emit("chat message", input.value);
+          // compute a unique offset/unique id for each message
+          const clientOffset = `${socket.id}-${counter++}`;
+          socket.emit("chat message", input.value, clientOffset);
           input.value = "";
         }
       });
@@ -84,6 +96,19 @@
         item.textContent = msg;
         messages.appendChild(item);
         window.scrollTo(0, document.body.scrollHeight);
+        //The client keep track of the offset for syncing data in case of disconnection
+        socket.auth.serverOffset = serverOffset;
+      });
+
+      toggleButton.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (socket.connected) {
+          toggleButton.innerText = "Connect";
+          socket.disconnect();
+        } else {
+          toggleButton.innerText = "Disconnect";
+          socket.connect();
+        }
       });
     </script>
   </body>
